@@ -28,6 +28,7 @@ object HttpAppSpec extends DefaultRunnableSpec with HttpMessageAssertions {
       IllegalMessageSpec,
       ContentDecoderSpec,
       RemoteAddressSpec,
+      OperationsSpec,
     ).provideCustomLayer(env) @@ timeout(10 seconds)
 
   /**
@@ -220,6 +221,30 @@ object HttpAppSpec extends DefaultRunnableSpec with HttpMessageAssertions {
     testM("remoteAddress") {
       val addr = HttpApp.fromHttp(Http.succeed(Ok)).getRequest().map(_.remoteAddress)
       assertM(addr)(isNone)
+    }
+  }
+
+  def OperationsSpec = suite("OperationsSpec") {
+    testM("providde") {
+      val app: HttpApp[Response[Any, Nothing], Nothing] = HttpApp.fromHttp {
+        Http.fromEffect {
+          ZIO
+            .environment[Response[Any, Nothing]]
+            .flatMap { response =>
+              ZIO.succeed(response)
+            }
+//          .provide(Response(Status.FORBIDDEN))
+        }
+      }
+        .provide(Ok)
+
+      /**
+       * .provide =>> self.copy(self.asHttp.provide(r)) which in turn calls the following:
+       * Http.fromPartialFunction[A](a => self(a).provide(r)) self(a) gives a ZIO[_,_,_]
+       * and provide should just eliminate the requirement on R !! but doesn't
+       */
+
+      assertM(app.getResponse)(isResponse(responseStatus(403)))
     }
   }
 }
